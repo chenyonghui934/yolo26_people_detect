@@ -1,16 +1,7 @@
-import subprocess
-import sys
-subprocess.run([sys.executable, "-m", "pip", "install", "opencv-python"])
-import cv2
-
 import streamlit as st
-import cv2
 import numpy as np
 from ultralytics import YOLO
-import streamlit as st
-import cv2
-import numpy as np
-from ultralytics import YOLO
+from PIL import Image
 
 # 页面基础设置
 st.set_page_config(page_title="人数检测工具", layout="wide")
@@ -19,8 +10,7 @@ st.title("图片人群计数检测")
 # 加载模型（只加载一次，加速）
 @st.cache_resource
 def load_model():
-    return YOLO("yolo26n.pt")
-
+    return YOLO("yolo11m.pt") # 不要上传本地yolo26n.pt，云端自动下载
 model = load_model()
 
 # 上传图片组件
