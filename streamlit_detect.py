@@ -1,3 +1,8 @@
+import subprocess
+import sys
+subprocess.run([sys.executable, "-m", "pip", "install", "opencv-python"])
+import cv2
+
 import streamlit as st
 import cv2
 import numpy as np
