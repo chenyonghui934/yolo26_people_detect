@@ -1,3 +1,12 @@
+import subprocess
+import sys
+# 云端强制安装opencv
+subprocess.run([sys.executable, "-m", "pip", "install", "opencv-python"], check=True)
+
+import streamlit as st
+import cv2
+import numpy as np
+from ultralytics import YOLO
 import streamlit as st
 import cv2
 import numpy as np
@@ -10,7 +19,7 @@ st.title("图片人群计数检测")
 # 加载模型（只加载一次，加速）
 @st.cache_resource
 def load_model():
-    return YOLO("yolo26l.pt")
+    return YOLO("yolo26n.pt")
 
 model = load_model()
 
