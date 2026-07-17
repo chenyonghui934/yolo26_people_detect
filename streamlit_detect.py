@@ -1,8 +1,3 @@
-import subprocess
-import sys
-# 云端强制安装opencv
-subprocess.run([sys.executable, "-m", "pip", "install", "opencv-python"], check=True)
-
 import streamlit as st
 import cv2
 import numpy as np
