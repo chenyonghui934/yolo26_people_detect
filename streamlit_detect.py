@@ -9,7 +9,7 @@ st.title("图片人群计数检测")
 
 @st.cache_resource
 def load_model():
-    return YOLO("yolo11m.pt")
+    return YOLO("best.pt")
 model = load_model()
 
 upload_img = st.file_uploader("上传图片", type=["jpg", "png", "jpeg"])
@@ -18,10 +18,10 @@ if upload_img is not None:
     img = Image.open(upload_img).convert("RGB")
     results = model(
         img,
-        conf=0.10,
+        conf=0.08,
         imgsz=1280,
         max_det=1000,
-        iou=0.10,
+        iou=0.07,
         augment=True,
         agnostic_nms=True,
         classes=[0]
