@@ -18,10 +18,10 @@ if upload_img is not None:
     img = Image.open(upload_img).convert("RGB")
     results = model(
         img,
-        conf=0.08,
+        conf=0.2,
         imgsz=1280,
         max_det=1000,
-        iou=0.07,
+        iou=0.15,
         augment=True,
         agnostic_nms=True,
         classes=[0]
