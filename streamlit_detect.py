@@ -11,7 +11,7 @@ st.set_page_config(
 )
 
 # 顶部标题美化+分割线
-st.title("📸 图片多人检测与计数系统")
+st.title(" 图片多人检测与计数系统")
 st.divider()  # 分割线，区分标题和功能区
 
 
