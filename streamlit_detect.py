@@ -28,7 +28,7 @@ if upload_img:
     img = Image.open(upload_img)
     st.image(img, caption="原图")
     # 推理，适配密集人群参数
-    res = model.predict(img, conf=0.12, iou=0.4, imgsz=1280, classes=[0])
+    res = model.predict(img, conf=0.15, iou=0.3, imgsz=1280, classes=[0])
     detect_img = res[0].plot()
     count = len(res[0].boxes)
     st.image(detect_img, caption=f"检测完成，总人数：{count}")
