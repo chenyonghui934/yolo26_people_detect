@@ -3,30 +3,32 @@ import numpy as np
 from ultralytics import YOLO
 from PIL import Image
 
-# 页面基础设置
-st.set_page_config(page_title="人数检测工具", layout="wide")
-st.title("图片人群计数检测")
+st.set_page_config(page_title="人群计数", layout="wide")
+st.title="多人检测工具"
+
+# 缓存两个模型，只加载一次
+@st.cache_resource
+def load_yolo11():
+    return YOLO("yolo11m.pt")
 
 @st.cache_resource
-def load_model():
+def load_custom():
     return YOLO("best.pt")
-model = load_model()
 
-upload_img = st.file_uploader("上传图片", type=["jpg", "png", "jpeg"])
+# 下拉选择模型
+model_choose = st.selectbox("选择检测模型",["官方YOLO11m通用模型","自定义人群专用模型(同学训练)"])
+if model_choose == "官方YOLO11m通用模型":
+    model = load_yolo11()
+else:
+    model = load_custom()
 
-if upload_img is not None:
-    img = Image.open(upload_img).convert("RGB")
-    results = model(
-        img,
-        conf=0.2,
-        imgsz=1280,
-        max_det=1000,
-        iou=0.15,
-        augment=True,
-        agnostic_nms=True,
-        classes=[0]
-    )
-    result_img = results[0].plot()
-    person_count = len(results[0].boxes)
-    st.subheader(f"检测完成，总人数：{person_count}")
-    st.image(result_img, use_column_width=True)
+# 上传图片
+upload_img = st.file_uploader("上传图片",type=["jpg","png","jpeg"])
+if upload_img:
+    img = Image.open(upload_img)
+    st.image(img, caption="原图")
+    # 推理，适配密集人群参数
+    res = model.predict(img, conf=0.15, iou=0.3, imgsz=1280, classes=[0])
+    detect_img = res[0].plot()
+    count = len(res[0].boxes)
+    st.image(detect_img, caption=f"检测完成，总人数：{count}")
