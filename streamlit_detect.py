@@ -23,8 +23,8 @@ def load_custom():
 with st.sidebar:
     st.header("参数设置")
     model_type = st.selectbox("选择检测模型", ["通用YOLO11", "人群专用训练模型"])
-    conf_val = st.slider("置信度 conf", min_value=0.05, max_value=0.6, value=0.15, step=0.05)
-    iou_val = st.slider("去重阈值 iou", min_value=0.1, max_value=0.7, value=0.35, step=0.05)
+    conf_val = st.slider("置信度 conf", min_value=0.05, max_value=0.6, value=0.15, step=0.01)
+    iou_val = st.slider("去重阈值 iou", min_value=0.1, max_value=0.7, value=0.35, step=0.01)
 
 # 加载模型
 if model_type == "通用YOLO11":
