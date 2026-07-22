@@ -21,7 +21,7 @@ def load_model():
 model = load_model()
 
 
-# 复用你的人数统计过滤函数
+# 人数统计过滤函数
 def count_people_box(results):
     people_num = 0
     min_w = 12
@@ -51,28 +51,38 @@ def detect_image(image_pil, conf, iou):
     return result_img, num
 
 
-# 视频处理函数，增加异常判断
+# 视频处理【优化版】
 def detect_video_file(video_bytes, conf, iou):
-    temp_video = "temp_upload_video.mp4"
+    # 使用Linux系统官方临时目录 /tmp，权限最优
+    temp_video = "/tmp/temp_upload_video.mp4"
+    output_path = "/tmp/video_result.mp4"
+
+    # 先清理残留旧文件，防止冲突
+    if os.path.exists(temp_video):
+        os.remove(temp_video)
+    if os.path.exists(output_path):
+        os.remove(output_path)
+
     with open(temp_video, "wb") as f:
         f.write(video_bytes)
 
     cap = cv2.VideoCapture(temp_video)
     if not cap.isOpened():
         os.remove(temp_video)
-        raise Exception("无法解析上传的视频文件")
+        raise Exception("无法解析上传视频")
 
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     if width <= 0 or height <= 0:
-        raise Exception("读取视频分辨率失败")
+        raise Exception("视频分辨率读取失败")
 
-    output_path = "video_result.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*'avc1')
+    # 更换编码器 mp4v
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
+    frame_count = 0
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -80,15 +90,17 @@ def detect_video_file(video_bytes, conf, iou):
         results = model.track(frame, conf=conf, iou=iou, persist=True, classes=[0])
         draw_frame = results[0].plot()
         out.write(draw_frame)
+        frame_count += 1
 
     cap.release()
     out.release()
     os.remove(temp_video)
 
-    # 新增：判断文件是否生成成功
-    if not os.path.exists(output_path):
+    # 校验：必须写入有效帧数
+    if not os.path.exists(output_path) or frame_count == 0:
         raise Exception("云端编码器异常，视频文件生成失败！")
-    # 读取到内存
+
+    # 载入内存
     with open(output_path, "rb") as f:
         video_buffer = io.BytesIO(f.read())
     os.remove(output_path)
@@ -101,10 +113,9 @@ with st.sidebar:
     conf_val = st.slider("置信度 conf", min_value=0.01, max_value=0.99, value=0.35, step=0.01)
     iou_val = st.slider("IOU阈值", min_value=0.01, max_value=0.99, value=0.65, step=0.01)
 
-# 分页标签
 tab1, tab2 = st.tabs(["图片检测", "视频文件检测"])
 
-# 图片检测页面
+# 图片检测
 with tab1:
     upload_img = st.file_uploader("上传课堂图片", type=["jpg", "png", "jpeg"])
     if upload_img is not None:
@@ -118,17 +129,17 @@ with tab1:
                 st.image(res_img, caption="检测标注结果", use_column_width=True)
             st.text_area("识别结果", f"检测到课堂到场总人数：{total}")
 
-# 视频检测页面
+# 视频检测
 with tab2:
-    upload_vid = st.file_uploader("上传本地视频文件", type=["mp4", "mov"])
+    upload_vid = st.file_uploader("上传本地视频文件", type=["mp4"])
     if upload_vid is not None:
         st.video(upload_vid)
         if st.button("开始分析视频"):
             try:
-                with st.spinner("视频处理中，请勿刷新页面..."):
+                with st.spinner("视频处理中，请勿刷新，建议使用3~5秒短视频！"):
                     vid_data = upload_vid.read()
                     video_buf = detect_video_file(vid_data, conf_val, iou_val)
                     st.success("视频检测完成！下方为标注结果视频")
                     st.video(video_buf)
             except Exception as e:
-                st.error(f"视频处理失败：{str(e)}。云端环境编码器存在兼容问题，请使用图片检测功能，视频演示本地运行！")
+                st.error(f"视频处理失败：{str(e)}。建议缩短视频时长，或使用图片检测功能！")
