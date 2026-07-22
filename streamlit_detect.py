@@ -50,7 +50,7 @@ def detect_image(image_pil, conf, iou):
     return result_img, num
 
 
-# 修复后的视频检测函数
+# 修复编码器+播放逻辑的视频检测函数
 def detect_video_file(video_bytes, conf, iou):
     temp_video = "temp_upload_video.mp4"
     with open(temp_video, "wb") as f:
@@ -65,8 +65,11 @@ def detect_video_file(video_bytes, conf, iou):
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
+    if width <= 0 or height <= 0:
+        raise Exception("读取视频分辨率失败")
+
     output_path = "video_result.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fourcc = cv2.VideoWriter_fourcc(*'avc1')
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
     while cap.isOpened():
@@ -116,5 +119,5 @@ with tab2:
                 vid_data = upload_vid.read()
                 out_video_path = detect_video_file(vid_data, conf_val, iou_val)
                 st.success("视频检测完成！下方为标注结果视频")
-                with open(out_video_path, "rb") as f:
-                    st.video(f.read())
+                # 直接传入文件路径，不再读取二进制
+                st.video(out_video_path)
