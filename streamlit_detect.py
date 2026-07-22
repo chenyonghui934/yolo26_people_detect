@@ -1,54 +1,28 @@
 import streamlit as st
-import numpy as np
-from ultralytics import YOLO
 from PIL import Image
+from ultralytics import YOLO
+import os
+import cv2
+import numpy as np
 
-# 页面配置
-st.set_page_config(
-    page_title="人群计数检测工具",
-    layout="wide"
-)
-st.title("图片多人检测与计数系统")
+# 页面基础配置
+st.set_page_config(page_title="智眸慧眼——课堂实时考勤人数统计系统", layout="wide")
+st.title("智眸慧眼——课堂实时考勤人数统计系统")
 st.divider()
 
-# 模型缓存
+# 模型只加载一次
 @st.cache_resource
-def load_yolo11():
-    return YOLO("yolo11m.pt")
-@st.cache_resource
-def load_custom():
+def load_model():
     return YOLO("best.pt")
+model = load_model()
 
-# 侧边参数
-with st.sidebar:
-    st.header("参数设置")
-    model_type = st.selectbox("选择检测模型", ["通用YOLO11", "人群专用训练模型"])
-    conf_val = st.slider("置信度 conf", min_value=0.05, max_value=1.0, value=0.15, step=0.01)
-    iou_val = st.slider("去重阈值 iou", min_value=0.1, max_value=1.0, value=0.35, step=0.01)
-
-# 加载模型
-if model_type == "通用YOLO11":
-    model = load_yolo11()
-else:
-    model = load_custom()
-
-# 分栏上传
-col1, col2 = st.columns(2)
-upload_img = st.file_uploader("点击上传待检测图片", type=["jpg", "png", "jpeg"])
-if upload_img is not None:
-    img = Image.open(upload_img)
-    with col1:
-        st.subheader("原图展示")
-        st.image(img, use_column_width=True)
-    # 推理
-    res = model.predict(img, conf=conf_val, iou=iou_val, imgsz=1280, classes=[0])
-    detect_img = res[0].plot()
-    # 四层过滤计数
+# 复用你的人数统计过滤函数
+def count_people_box(results):
     people_num = 0
-    min_w = 25
-    min_h = 35
-    max_aspect = 3.0
-    boxes = res[0].boxes
+    min_w = 12
+    min_h = 15
+    max_aspect = 4.5
+    boxes = results[0].boxes
     for box in boxes:
         if box.cls.item() != 0:
             continue
@@ -56,12 +30,85 @@ if upload_img is not None:
         box_w = x2 - x1
         box_h = y2 - y1
         if box_w >= min_w and box_h >= min_h:
-            aspect_ratio = box_h / box_w
-            if aspect_ratio < max_aspect:
+            aspect = box_h / box_w
+            if aspect < max_aspect:
                 people_num += 1
-    with col2:
-        st.subheader("检测结果")
-        st.image(detect_img, use_column_width=True)
-        st.success(f"图片内识别到总人数：{people_num}")
-st.divider()
-st.caption("使用说明：左侧侧边栏切换模型、调整检测参数；上传图片自动识别人体，内置尺寸、宽高比双重过滤剔除书包、阴影干扰。")
+    return people_num
+
+# 图片检测函数
+def detect_image(image_pil, conf, iou):
+    img_cv = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
+    res = model(img_cv, conf=conf, iou=iou)
+    num = count_people_box(res)
+    result_img = res[0].plot()
+    result_img = cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB)
+    return result_img, num
+
+# 新增网页上传视频检测
+def detect_video_file(video_bytes, conf, iou):
+    temp_video = "temp_upload_video.mp4"
+    with open(temp_video, "wb") as f:
+        f.write(video_bytes)
+
+    cap = cv2.VideoCapture(temp_video)
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+
+    output_path = "video_result.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+    # track目标追踪，避免同一人重复计数
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        results = model.track(frame, conf=conf, iou=iou, persist=True, classes=[0])
+        draw_frame = results[0].plot()
+        out.write(draw_frame)
+
+    cap.release()
+    out.release()
+    os.remove(temp_video)
+    return output_path
+
+# 侧边参数面板
+with st.sidebar:
+    st.header("参数设置")
+    conf_val = st.slider("置信度 conf", min_value=0.01, max_value=0.99, value=0.35, step=0.01)
+    iou_val = st.slider("IOU阈值", min_value=0.01, max_value=0.99, value=0.65, step=0.01)
+
+# 分页标签
+tab1, tab2 = st.tabs(["图片检测", "视频文件检测"])
+
+# 图片检测页面
+with tab1:
+    upload_img = st.file_uploader("上传课堂图片", type=["jpg", "png", "jpeg"])
+    if upload_img is not None:
+        img_ori = Image.open(upload_img)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.image(img_ori, caption="原始图片", use_column_width=True)
+        if st.button("开始检测图片"):
+            res_img, total = detect_image(img_ori, conf_val, iou_val)
+            with col2:
+                st.image(res_img, caption="检测标注结果", use_column_width=True)
+            st.text_area("识别结果", f"检测到课堂到场总人数：{total}")
+
+# 视频检测页面
+with tab2:
+    upload_vid = st.file_uploader("上传本地视频文件", type=["mp4", "mov"])
+    if upload_vid is not None:
+        st.video(upload_vid)
+        if st.button("开始分析视频"):
+            with st.spinner("视频处理中，请勿刷新页面，长视频需要等待较长时间..."):
+                vid_data = upload_vid.read()
+                out_video_path = detect_video_file(vid_data, conf_val, iou_val)
+                st.success("视频检测完成！下方为标注结果视频")
+                with open(out_video_path, "rb") as f:
+                    st.video(f.read())
+
+# 拓展预留：摄像头实时检测（不部署云端，仅本地测试）
+# 后续有余力本地调试再启用，云端免费环境极易崩溃
+# 需要额外安装 streamlit-webrtc
