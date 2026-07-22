@@ -4,6 +4,7 @@ from ultralytics import YOLO
 import os
 import cv2
 import numpy as np
+import io
 
 # 页面基础配置
 st.set_page_config(page_title="智眸慧眼——课堂实时考勤人数统计系统", layout="wide")
@@ -50,7 +51,7 @@ def detect_image(image_pil, conf, iou):
     return result_img, num
 
 
-# 修复编码器+播放逻辑的视频检测函数
+# 视频处理函数：全部内存操作，规避临时文件找不到问题
 def detect_video_file(video_bytes, conf, iou):
     temp_video = "temp_upload_video.mp4"
     with open(temp_video, "wb") as f:
@@ -83,7 +84,12 @@ def detect_video_file(video_bytes, conf, iou):
     cap.release()
     out.release()
     os.remove(temp_video)
-    return output_path
+
+    # 将生成结果读取到内存，再返回二进制数据
+    with open(output_path, "rb") as f:
+        video_buffer = io.BytesIO(f.read())
+    os.remove(output_path)
+    return video_buffer
 
 
 # 侧边参数面板
@@ -117,7 +123,7 @@ with tab2:
         if st.button("开始分析视频"):
             with st.spinner("视频处理中，请勿刷新页面，长视频需要等待较长时间..."):
                 vid_data = upload_vid.read()
-                out_video_path = detect_video_file(vid_data, conf_val, iou_val)
+                video_buf = detect_video_file(vid_data, conf_val, iou_val)
                 st.success("视频检测完成！下方为标注结果视频")
-                # 直接传入文件路径，不再读取二进制
-                st.video(out_video_path)
+                # 传入内存二进制对象，不再读取本地文件路径
+                st.video(video_buf)
