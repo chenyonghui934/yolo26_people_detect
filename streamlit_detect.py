@@ -51,7 +51,7 @@ def detect_image(image_pil, conf, iou):
     return result_img, num
 
 
-# 视频处理函数：全部内存操作，规避临时文件找不到问题
+# 视频处理函数，增加异常判断
 def detect_video_file(video_bytes, conf, iou):
     temp_video = "temp_upload_video.mp4"
     with open(temp_video, "wb") as f:
@@ -85,7 +85,10 @@ def detect_video_file(video_bytes, conf, iou):
     out.release()
     os.remove(temp_video)
 
-    # 将生成结果读取到内存，再返回二进制数据
+    # 新增：判断文件是否生成成功
+    if not os.path.exists(output_path):
+        raise Exception("云端编码器异常，视频文件生成失败！")
+    # 读取到内存
     with open(output_path, "rb") as f:
         video_buffer = io.BytesIO(f.read())
     os.remove(output_path)
@@ -121,9 +124,11 @@ with tab2:
     if upload_vid is not None:
         st.video(upload_vid)
         if st.button("开始分析视频"):
-            with st.spinner("视频处理中，请勿刷新页面，长视频需要等待较长时间..."):
-                vid_data = upload_vid.read()
-                video_buf = detect_video_file(vid_data, conf_val, iou_val)
-                st.success("视频检测完成！下方为标注结果视频")
-                # 传入内存二进制对象，不再读取本地文件路径
-                st.video(video_buf)
+            try:
+                with st.spinner("视频处理中，请勿刷新页面..."):
+                    vid_data = upload_vid.read()
+                    video_buf = detect_video_file(vid_data, conf_val, iou_val)
+                    st.success("视频检测完成！下方为标注结果视频")
+                    st.video(video_buf)
+            except Exception as e:
+                st.error(f"视频处理失败：{str(e)}。云端环境编码器存在兼容问题，请使用图片检测功能，视频演示本地运行！")
